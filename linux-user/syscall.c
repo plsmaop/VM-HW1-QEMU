@@ -116,6 +116,8 @@ int __clone2(int (*fn)(void *), void *child_stack_base,
 
 #include "qemu.h"
 
+#include "instrumentation/results.h"
+
 #ifndef CLONE_IO
 #define CLONE_IO                0x80000000      /* Clone io context */
 #endif
@@ -9784,6 +9786,8 @@ abi_long do_syscall(void *cpu_env, int num, abi_long arg1,
 #ifdef TARGET_GPROF
         _mcleanup();
 #endif
+        print_instrumentation_results();
+
         gdb_exit(cpu_env, arg1);
         ret = get_errno(exit_group(arg1));
         break;
