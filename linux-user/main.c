@@ -37,6 +37,8 @@
 #include "trace/control.h"
 #include "glib-compat.h"
 
+#include "instrumentation/args.h"
+
 char *exec_path;
 
 int singlestep;
@@ -4857,6 +4859,9 @@ int main(int argc, char **argv, char **envp)
         }
         gdb_handlesig(cpu, 0);
     }
+
+    fetch_instrumentation_args();
+
     cpu_loop(env);
     /* never exits */
     return 0;
