@@ -1445,7 +1445,11 @@ static inline void increment_cnt_of_entry(struct InstruEntry **entries, uint64_t
 struct InstruEntry *dests = NULL;
 pthread_rwlock_t rwlock_dests = PTHREAD_RWLOCK_INITIALIZER;
 
-void HELPER(targets_of_branch)(CPUARMState *env) {
+void HELPER(targets_of_branch)(uint64_t addr) {
+    increment_cnt_of_entry(&dests, addr, &rwlock_dests);
+}
+
+void HELPER(targets_of_branch_indirect)(CPUARMState *env) {
     increment_cnt_of_entry(&dests, env->pc, &rwlock_dests);
 }
 

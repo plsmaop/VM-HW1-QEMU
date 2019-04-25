@@ -536,10 +536,11 @@ DEF_HELPER_2(dc_zva, void, env, i64)
 DEF_HELPER_FLAGS_2(neon_pmull_64_lo, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 DEF_HELPER_FLAGS_2(neon_pmull_64_hi, TCG_CALL_NO_RWG_SE, i64, i64, i64)
 
-DEF_HELPER_1(conditional_branch_info, void, i32)
-DEF_HELPER_1(targets_of_branch, void, env)
+DEF_HELPER_1(targets_of_branch, void, i64)
+DEF_HELPER_1(targets_of_branch_indirect, void, env)
 DEF_HELPER_1(entries_of_basic_block, void, i64)
 DEF_HELPER_2(entries_of_basic_block_indirect, void, env, i64)
+DEF_HELPER_1(conditional_branch_info, void, i32)
 
 #ifdef TARGET_AARCH64
 #include "helper-a64.h"
