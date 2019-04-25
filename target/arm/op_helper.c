@@ -25,6 +25,11 @@
 #include "exec/exec-all.h"
 #include "exec/cpu_ldst.h"
 
+#include "instrumentation/results.h"
+#include "instrumentation/args.h"
+#include "instrumentation/uthash.h"
+#include <pthread.h>
+
 #define SIGNBIT (uint32_t)0x80000000
 #define SIGNBIT64 ((uint64_t)1 << 63)
 
@@ -1404,5 +1409,75 @@ uint32_t HELPER(ror_cc)(CPUARMState *env, uint32_t x, uint32_t i)
     } else {
         env->CF = (x >> (shift - 1)) & 1;
         return ((uint32_t)x >> shift) | (x << (32 - shift));
+    }
+}
+
+/*
+ * Shared Functions for Instrumentation
+ */
+
+static inline void atomic_increment(uint64_t *ptr) {
+    __atomic_fetch_add(ptr, 1, __ATOMIC_SEQ_CST);
+}
+
+static inline void increment_cnt_of_entry(struct InstruEntry **entries, uint64_t addr, pthread_rwlock_t *rwlock) {
+    struct InstruEntry *entry;
+    pthread_rwlock_rdlock(rwlock);
+    HASH_FIND_INT(*entries, &addr, entry);
+    pthread_rwlock_unlock(rwlock);
+    if (entry != NULL) {
+        atomic_increment(&(entry->cnt));
+        return;
+    }
+
+    entry = (struct InstruEntry *)malloc(sizeof *entry);
+    entry->addr = addr;
+    entry->cnt = 1;
+    pthread_rwlock_wrlock(rwlock);
+    HASH_ADD_INT(*entries, addr, entry);
+    pthread_rwlock_unlock(rwlock);
+}
+
+/*
+ * Targets of Branch
+ */
+
+struct InstruEntry *dests = NULL;
+pthread_rwlock_t rwlock_dests = PTHREAD_RWLOCK_INITIALIZER;
+
+void HELPER(targets_of_branch)(CPUARMState *env) {
+    increment_cnt_of_entry(&dests, env->pc, &rwlock_dests);
+}
+
+/*
+ * Entries of Basic Block
+ */
+
+struct InstruEntry *srcs = NULL;
+pthread_rwlock_t rwlock_srcs = PTHREAD_RWLOCK_INITIALIZER;
+
+void HELPER(entries_of_basic_block)(uint64_t branch_addr) {
+    increment_cnt_of_entry(&srcs, branch_addr, &rwlock_srcs);
+}
+
+void HELPER(entries_of_basic_block_indirect)(CPUARMState *env, uint64_t branch_addr) {
+    if (unlikely(env->pc == entries_of_basic_block)) {
+        increment_cnt_of_entry(&srcs, branch_addr, &rwlock_srcs);
+    }
+}
+
+/*
+ * Conditional Branch Info
+ */
+
+uint64_t n_taken = 0;
+uint64_t n_not_taken = 0;
+
+// taken should be a bool, but uint32_t is the closest type supported
+void HELPER(conditional_branch_info)(uint32_t taken) {
+    if (taken) {
+        atomic_increment(&n_taken);
+    } else {
+        atomic_increment(&n_not_taken);
     }
 }
