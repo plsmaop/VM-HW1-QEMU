@@ -36,6 +36,8 @@
 
 #include "trace-tcg.h"
 
+#include "instrumentation/args.h"
+
 static TCGv_i64 cpu_X[32];
 static TCGv_i64 cpu_pc;
 
@@ -99,6 +101,35 @@ void a64_translate_init(void)
 
     cpu_exclusive_high = tcg_global_mem_new_i64(cpu_env,
         offsetof(CPUARMState, exclusive_high), "exclusive_high");
+}
+
+// define extern variables for instrumentation
+uint64_t targets_of_branch;
+uint64_t entries_of_basic_block;
+uint64_t conditional_branch_info;
+
+static inline void try_gen_helper_targets_of_branch(uint64_t pc) {
+    uint64_t branch_addr = pc - 4;
+    if (unlikely(branch_addr == targets_of_branch)) {
+        gen_helper_targets_of_branch(cpu_env);
+    }
+}
+
+static inline void try_gen_helper_entries_of_basic_block(uint64_t pc, uint64_t dest) {
+    if (unlikely(dest == entries_of_basic_block)) {
+        TCGv_i64 branch_addr = tcg_const_i64(pc - 4);
+        gen_helper_entries_of_basic_block(branch_addr);
+        tcg_temp_free_i64(branch_addr);
+    }
+}
+
+static inline void try_gen_helper_conditional_branch_info(uint64_t pc, uint32_t taken) {
+    uint64_t branch_addr = pc - 4;
+    if (unlikely(branch_addr == conditional_branch_info)) {
+        TCGv_i32 tmp = tcg_const_i32(taken);
+        gen_helper_conditional_branch_info(tmp);
+        tcg_temp_free_i32(tmp);
+    }
 }
 
 static inline ARMMMUIdx get_a64_user_mem_index(DisasContext *s)
@@ -358,16 +389,21 @@ static inline bool use_goto_tb(DisasContext *s, int n, uint64_t dest)
 
 static inline void gen_goto_tb(DisasContext *s, int n, uint64_t dest)
 {
-    TranslationBlock *tb;
+    try_gen_helper_entries_of_basic_block(s->pc, dest);
+    try_gen_helper_conditional_branch_info(s->pc, dest != s->pc);
 
+    TranslationBlock *tb;
+    
     tb = s->tb;
     if (use_goto_tb(s, n, dest)) {
         tcg_gen_goto_tb(n);
         gen_a64_set_pc_im(dest);
+        try_gen_helper_targets_of_branch(s->pc);
         tcg_gen_exit_tb((intptr_t)tb + n);
         s->is_jmp = DISAS_TB_JUMP;
     } else {
         gen_a64_set_pc_im(dest);
+        try_gen_helper_targets_of_branch(s->pc);
         if (s->ss_active) {
             gen_step_complete_exception(s);
         } else if (s->singlestep_enabled) {
@@ -1773,6 +1809,10 @@ static void disas_uncond_b_reg(DisasContext *s, uint32_t insn)
         if (opc == 1) {
             tcg_gen_movi_i64(cpu_reg(s, 30), s->pc);
         }
+        try_gen_helper_targets_of_branch(s->pc);
+        TCGv_i64 branch_addr = tcg_const_i64(s->pc - 4);
+        gen_helper_entries_of_basic_block_indirect(cpu_env, branch_addr);
+        tcg_temp_free_i64(branch_addr);
         break;
     case 4: /* ERET */
         if (s->current_el == 0) {
