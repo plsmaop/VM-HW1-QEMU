@@ -20,7 +20,7 @@ extern uint64_t n_taken;
 extern uint64_t n_not_taken;
 
 static inline bool addr_sort(struct InstruEntry *a, struct InstruEntry *b) {
-    return a->addr - b->addr;
+    return a->addr > b->addr;
 }
 
 static inline void sort_by_addr(struct InstruEntry **entries) {
@@ -36,13 +36,13 @@ static inline void print_entries(struct InstruEntry **entries) {
 }
 
 static inline void print_instrumentation_results(void) {
-    printf("Targets of branch %" PRIx64 "\n", targets_of_branch);
+    printf("Targets of branch 0x%" PRIx64 "\n", targets_of_branch);
     print_entries(&dests);
 
-    printf("Entries of BasicBlock %" PRIx64 "\n", entries_of_basic_block);
+    printf("Entries of BasicBlock 0x%" PRIx64 "\n", entries_of_basic_block);
     print_entries(&srcs);
 
-    printf("Conditional branch %" PRIx64 "\n", conditional_branch_info);
+    printf("Conditional branch 0x%" PRIx64 "\n", conditional_branch_info);
     printf("taken:%" PRIu64 ", not-taken:%" PRIu64 "\n", n_taken, n_not_taken);
 
     fflush(stdout);

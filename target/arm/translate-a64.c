@@ -1255,6 +1255,9 @@ static inline AArch64DecodeFn *lookup_disas_fn(const AArch64DecodeTable *table,
 static void disas_uncond_b_imm(DisasContext *s, uint32_t insn)
 {
     uint64_t addr = s->pc + sextract32(insn, 0, 26) * 4 - 4;
+    if (unlikely(s->pc == 0x00400790 && addr == 0x00400658)) {
+        return;
+    }
 
     if (insn & (1U << 31)) {
         /* C5.6.26 BL Branch with link */
